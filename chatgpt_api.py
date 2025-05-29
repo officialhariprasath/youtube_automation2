@@ -1,15 +1,15 @@
 import os
-from openai import OpenAI
+import openai
 
-# Initialize the OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Set the API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_chatgpt_response(prompt):
     """
     Get a response from ChatGPT API
     """
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "user", "content": prompt}
