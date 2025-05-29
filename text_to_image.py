@@ -1,3 +1,22 @@
+import sys
+import subprocess
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Install gradio and diffusers if running in Colab
+try:
+    import google.colab
+    install('gradio')
+    install('diffusers')
+    install('torch')
+    install('transformers')
+    install('accelerate')
+    install('safetensors')
+    install('Pillow')
+except ImportError:
+    pass
+
 import torch
 from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 import gradio as gr
@@ -19,36 +38,43 @@ def load_model():
     
     return pipe
 
-def generate_image(prompt, negative_prompt="", num_inference_steps=30, guidance_scale=7.5):
-    pipe = load_model()
-    
-    # Generate the image
+pipe = None
+
+def generate_image(prompt, negative_prompt, steps, guidance_scale, width, height, seed):
+    global pipe
+    if pipe is None:
+        pipe = load_model()
+    generator = torch.manual_seed(int(seed))
     image = pipe(
         prompt=prompt,
         negative_prompt=negative_prompt,
-        num_inference_steps=num_inference_steps,
-        guidance_scale=guidance_scale
+        num_inference_steps=int(steps),
+        guidance_scale=float(guidance_scale),
+        width=int(width),
+        height=int(height),
+        generator=generator
     ).images[0]
-    
     return image
 
-# Create Gradio interface
-def create_interface():
-    iface = gr.Interface(
-        fn=generate_image,
-        inputs=[
-            gr.Textbox(label="Prompt", placeholder="Enter your prompt here..."),
-            gr.Textbox(label="Negative Prompt", placeholder="Enter what you don't want in the image..."),
-            gr.Slider(minimum=1, maximum=100, value=30, label="Number of Steps"),
-            gr.Slider(minimum=1, maximum=20, value=7.5, label="Guidance Scale")
-        ],
-        outputs=gr.Image(label="Generated Image"),
-        title="FLUX-LoRA-DLC Text to Image Generator",
-        description="Generate images from text using Stable Diffusion"
+with gr.Blocks() as demo:
+    gr.Markdown("# Text-to-Image Generator (Stable Diffusion 2.1)")
+    with gr.Row():
+        with gr.Column():
+            prompt = gr.Textbox(label="Prompt", placeholder="Describe your image...")
+            negative_prompt = gr.Textbox(label="Negative Prompt", placeholder="What do you NOT want?")
+            steps = gr.Slider(1, 100, value=30, label="Steps")
+            guidance_scale = gr.Slider(1, 20, value=7.5, label="Guidance Scale")
+            width = gr.Slider(256, 1024, value=512, step=64, label="Width")
+            height = gr.Slider(256, 1024, value=512, step=64, label="Height")
+            seed = gr.Number(value=42, label="Seed")
+            generate_btn = gr.Button("Generate")
+        with gr.Column():
+            output = gr.Image(label="Generated Image", type="pil")
+    generate_btn.click(
+        generate_image,
+        inputs=[prompt, negative_prompt, steps, guidance_scale, width, height, seed],
+        outputs=output
     )
-    return iface
 
 if __name__ == "__main__":
-    # Create and launch the interface
-    interface = create_interface()
-    interface.launch() 
+    demo.launch(share=True) 
